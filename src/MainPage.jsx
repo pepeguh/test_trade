@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { firestoreDb } from "./firebase";
 import {
   doc,
@@ -30,7 +30,10 @@ function MainPage() {
   const [whichUserAmI, setWhichUserAmI] = useState(0);
   const [docId, setDocId] = useState("");
   const [data, setData] = useState([]);
+  const [timerValue, setTimerValue] = useState(30)
   const [currentMove, setCurrentMove] = useState(0)
+  const [previousMove, setPreviousMove] = useState(null)
+  // const previousMove = useRef(null)
 
 
 
@@ -72,7 +75,8 @@ function MainPage() {
       const docRef = await addDoc(collection(db, "trades"), {
         name: adminTradeName,
         currentMove:-1,
-        isStarted:false
+        isStarted:false,
+        timerData:30
       });
       setIsTradeCreated(true);
       setDocId(docRef.id)
@@ -132,7 +136,97 @@ function MainPage() {
   
   
   const startTrade = async() => {
-    setIsTradeStarted(true)
+    if (!docId) {
+      console.error("Не задан id документа");
+      return;
+    }
+    const tradeDocRef = doc(db, "trades", docId);
+    try {
+   
+      const tradeDocSnapshot = await getDoc(tradeDocRef);
+  
+      if (tradeDocSnapshot.exists()) {
+        const tradeData = tradeDocSnapshot.data();
+  
+        
+        const participants = Object.keys(tradeData).filter((key) => key.startsWith("user_"));
+        if (participants.length >= 2) {
+          
+          await updateDoc(tradeDocRef, {
+            isStarted: true,
+            currentMove: 1 
+          });
+  
+          
+          setIsTradeStarted(true);
+          startTurnRotation(tradeDocRef, participants.length);
+          console.log("Торги успешно начались");
+        } else {
+          console.log("Недостаточно участников для начала торгов");
+        }
+      } else {
+        console.error("Документ не найден!");
+      }
+    } catch (error) {
+      console.error("Ошибка при запуске торгов: ", error);
+    }
+
+    
+  };
+  let turnInterval;
+  let countdownInterval;
+  const startTurnRotation = (tradeDocRef, numParticipants) => {
+    let currentTurn = 1;
+
+    const resetTimer = () => {
+      setTimerValue(30); 
+      if (countdownInterval){
+        clearInterval(countdownInterval)
+      };
+      countdownInterval = setInterval(() => {
+        setTimerValue((prev) => {
+          if (prev > 1) {
+            return prev - 1;
+          } else {
+            clearInterval(countdownInterval); 
+            return 0;
+          }
+        });
+      }, 1000);
+    };
+    
+
+    resetTimer();
+  
+    turnInterval = setInterval(async () => {
+      currentTurn = (currentTurn % numParticipants) + 1;
+      
+      try {
+        await updateDoc(tradeDocRef, { currentMove: currentTurn });
+        console.log(`Ход передан участнику ${currentTurn}`);
+      } catch (error) {
+        console.error("Ошибка при обновлении хода: ", error);
+      }
+      
+      resetTimer(); 
+    }, 30000); 
+  };
+  const stopTurnRotation = () => {
+    if (turnInterval) {
+      clearInterval(turnInterval);
+      turnInterval = null;
+      console.log("Смена хода остановлена");
+    }
+  };
+  
+  
+  const endTrade = async () => {
+    await updateDoc(doc(db, "trades", docId), {
+      isStarted: false,
+      currentMove: -1, 
+    });
+    setIsTradeStarted(false);
+    stopTurnRotation(); 
   };
 
   const authorizationHandler = ()=>{
@@ -173,12 +267,24 @@ function MainPage() {
     const unsubscribe = onSnapshot(userRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
         const documentData = docSnapshot.data();
+        const newMove = documentData.currentMove;
+        if (newMove != previousMove) {
+        
+          setCurrentMove(newMove);
+          setPreviousMove(newMove); 
+        }
         setAdminTradeName(documentData.name)
-        setCurrentMove(documentData.currentMove)
+       
         setIsTradeStarted(documentData.isStarted)
+        
         console.log(documentData.isStarted)
         const usersData = Object.keys(documentData)
           .filter((key) => key.startsWith("user_"))
+          .sort((a, b) => {
+            const numA = parseInt(a.split("_")[1], 10);
+            const numB = parseInt(b.split("_")[1], 10);
+            return numA - numB;
+          })
           .map((key) => documentData[key]);
   
         setData(usersData);
@@ -212,7 +318,24 @@ function MainPage() {
    }
     
   },[currentMove])
-
+  useEffect(() => {
+    if (isAdmin || currentMove === -1) return; 
+  
+    setTimerValue(30); 
+  
+    const countdown = setInterval(() => {
+      setTimerValue((prev) => {
+        if (prev > 1) {
+          return prev - 1;
+        } else {
+          clearInterval(countdown);
+          return 0;
+        }
+      });
+    }, 1000);
+  
+    return () => clearInterval(countdown); 
+  }, [currentMove]);
 
 
 
@@ -337,7 +460,7 @@ function MainPage() {
                      
                     {currentMove==item.id&&
                     <div className="timer current_timer" >
-                    <p>00:00:30</p>
+                    <p>00:00:{9>=timerValue?'0'+timerValue:timerValue}</p>
                     <svg
                       enableBackground="new 0 0 384.668 384.668"
                       viewBox="0 0 384.668 384.668"
@@ -416,8 +539,8 @@ function MainPage() {
           </table>
           {isAdmin && isTradeCreated && (
             <div className="options_menu">
-              <button onClick={() => startTrade}>Начать торги</button>
-              <button>Завершить торги</button>
+              <button onClick={() => startTrade()}>Начать торги</button>
+              <button onClick={()=>endTrade()}>Завершить торги</button>
             </div>
           )}
         </>
