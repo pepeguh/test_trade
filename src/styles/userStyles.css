@@ -1,0 +1,13 @@
+.user_panel{
+    
+}
+.user_inputs_div{
+
+}
+.user_inputs_div input{
+width: 32%;
+height: fit-content;
+}
+.your_move_btn{
+    background-color: green;
+}
