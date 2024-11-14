@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { serverTimestamp } from "firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { firestoreDb } from "./firebase";
@@ -34,12 +34,10 @@ function MainPage() {
   const [whichUserAmI, setWhichUserAmI] = useState(0);
   const [docId, setDocId] = useState("");
   const [data, setData] = useState([]);
-  const [timerValue, setTimerValue] = useState(1);//30
-  const [adminTimerValue, setAdminTimerValue] = useState(1);//30
+  const [timerValue, setTimerValue] = useState(30);
+  const [adminTimerValue, setAdminTimerValue] = useState(30);
   const [currentMove, setCurrentMove] = useState(0);
-  const [previousMove, setPreviousMove] = useState(null);
-  // const previousMove = useRef(null)
-  
+
   //debug
 const [timerCount, setTimerCount] = useState(0)
 const [adminTimerCount, setAdminTimerCount] = useState(0)
@@ -235,7 +233,7 @@ const [adminTimerCount, setAdminTimerCount] = useState(0)
   let adminCountDownInterval;
   
   const adminResetTimer = () => {
-    setAdminTimerValue(10);//30 ТУТ!!!
+    setAdminTimerValue(30);
     if (adminCountDownInterval) {
       clearInterval(adminCountDownInterval);
     }
@@ -252,7 +250,7 @@ const [adminTimerCount, setAdminTimerCount] = useState(0)
     }, 1000);
   };
   const resetTimer = () => {
-    setTimerValue(10);//30 ТУТ!!!
+    setTimerValue(30);
     if (countdownInterval) {
       clearInterval(countdownInterval);
     }
@@ -284,7 +282,7 @@ const [adminTimerCount, setAdminTimerCount] = useState(0)
       }
       
       
-    }, 10000);//30000 ТУТ!!!
+    }, 30000);
 
   }
 
